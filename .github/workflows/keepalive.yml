@@ -1,0 +1,27 @@
+# Render FREE tier 15-min tak koi hit nahi aaye to spin-down karta he.
+# Ye cron har 5 min /health pe ping maarta he -> service hamesha jaagi rahti he.
+# Public repo = Actions minutes FREE, koi signup/card nahi. Fail hone par GitHub khud email de deta he.
+name: render-keepalive
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # har 5 min (UTC)
+  workflow_dispatch: {}       # manual test ke liye
+
+permissions: {}
+
+concurrency:
+  group: render-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /health (keep-alive + status log)
+        run: |
+          code=$(curl -s -m 60 -o /tmp/h.json -w "%{http_code}" https://preopen-scanner-latest.onrender.com/health)
+          echo "HTTP $code"
+          cat /tmp/h.json
+          echo
+          [ "$code" = "200" ] || exit 1
