@@ -1,0 +1,61 @@
+name: cloud-nse-probe
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 32
+    env:
+      PORT: "8787"
+      POLL_SEC: "15"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install deps
+        run: pip install --quiet "curl_cffi>=0.11"
+
+      - name: Run probe background (24 min @ 15s)
+        run: |
+          export PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+          nohup python -u deploy/probe.py > probe.log 2>&1 &
+          echo "probe pid: $!"
+          # 24 min = 96 x 15s polls
+          for i in $(seq 1 96); do sleep 15; done
+
+      - name: Collect report
+        if: always()
+        run: |
+          mkdir -p report
+          curl -s http://127.0.0.1:8787/health > report/health.json
+          [ -s report/health.json ] || echo '{ "error": "server not running" }' > report/health.json
+          cp probe.log report/probe.log 2>/dev/null || true
+          echo "=========== SNAPSHOT ==========="
+          python3 - << 'PY'
+          import json
+          try:
+              d = json.load(open("report/health.json"))
+          except Exception as e:
+              print("health parse fail:", e); raise SystemExit
+          print("pass_rate:", d.get("pass_rate"), "%")
+          print("ok:", d.get("ok"), "| fail:", d.get("fail"))
+          h = d.get("history") or []
+          for x in h[-10:]:
+              print(" ", "OK " if x["ok"] else "FAIL", x["ms"], "ms |", x["detail"][:90])
+          PY
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-report
+          path: report/
