@@ -1,0 +1,14 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# auto-generated caches (dobara ban jate he — repo ko lean rakho)
+data/kite_instruments.json
+data/snapshot_latest.json
+
+# runtime logs
+*.log

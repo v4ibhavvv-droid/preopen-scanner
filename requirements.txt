@@ -1,0 +1,2 @@
+# sirf ye chahiye: NSE Akamai-safe fetch (Chrome TLS impersonation)
+curl_cffi>=0.11
