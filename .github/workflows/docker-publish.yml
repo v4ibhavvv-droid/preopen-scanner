@@ -1,7 +1,7 @@
-# GitHub Actions — probe image GHCR pe push (free, no-CC)
-# ClawCloud me app create karte waqt ye image use hogi:
-#   ghcr.io/<github-username>/preopen-probe:latest
-name: probe-image
+# GitHub Actions — dono images GHCR pe push (free, no-CC):
+#   probe   : ghcr.io/<user>/preopen-probe:latest    (deploy/Dockerfile — NSE feasibility probe)
+#   scanner : ghcr.io/<user>/preopen-scanner:latest  (deploy/Dockerfile.app — FULL dashboard+poller app)
+name: docker-images
 on:
   push:
     branches: [main]
@@ -34,3 +34,13 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/preopen-probe:latest
             ghcr.io/${{ github.repository_owner }}/preopen-probe:${{ github.sha }}
+
+      - name: Build + push full scanner app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.app
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/preopen-scanner:latest
+            ghcr.io/${{ github.repository_owner }}/preopen-scanner:${{ github.sha }}

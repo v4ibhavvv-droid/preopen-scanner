@@ -13,6 +13,7 @@ Resilience features:
 """
 import argparse
 import json
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -25,6 +26,11 @@ from scanner.kite_links import chart_url as kite_chart_url
 from scanner.nse_client import NSEClient
 
 IST = ZoneInfo("Asia/Kolkata")
+
+# ---------- Env overrides (Render/cloud deploy ke liye — local pe default wahi purana) ----------
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", PORT))
+POLL_INTERVAL_SEC = float(os.environ.get("POLL_INTERVAL_SEC", POLL_INTERVAL_SEC))
 
 # ---------- Poller state (shared with watchdog + health endpoint) ----------
 _poller_state = {
@@ -140,7 +146,7 @@ def main():
             r["url"] = kite_chart_url(r["symbol"], r.get("series", "EQ"))
         board.publish(rows, meta, "dev-fixture")
         print(f"[dev] {len(rows)} rows loaded from fixture")
-        serve(board, "127.0.0.1", PORT).serve_forever()
+        serve(board, HOST, PORT).serve_forever()
         return
 
     if args.once:
@@ -151,19 +157,19 @@ def main():
                          indent=2, ensure_ascii=False))
         return
 
-    print(f"[live] NSE poller {POLL_INTERVAL_SEC}s -> http://127.0.0.1:{PORT} (Ctrl+C = band)")
+    print(f"[live] NSE poller {POLL_INTERVAL_SEC}s -> http://{HOST}:{PORT} (Ctrl+C = band)")
     print(f"[live] Watchdog enabled (auto-restart if poller stalls >120s)")
-    print(f"[live] Health endpoint: http://127.0.0.1:{PORT}/health")
+    print(f"[live] Health endpoint: http://{HOST}:{PORT}/health")
     # Pehle port bind karo (fail-fast, friendly message) —
     # us ke BAAD hi poller/watchdog threads start (bind-fail par NSE bekaar hit na ho)
     try:
-        httpd = serve(board, "127.0.0.1", PORT, get_poller_state)
+        httpd = serve(board, HOST, PORT, get_poller_state)
     except OSError as e:
-        if getattr(e, "errno", None) == 48:
+        if getattr(e, "errno", None) in (48, 98):  # 48=macOS EADDRINUSE, 98=Linux EADDRINUSE
             print("", flush=True)
-            print("ERROR: port 8787 pehle se busy he — koi purana scanner chal raha he.", flush=True)
+            print(f"ERROR: port {PORT} pehle se busy he — koi purana scanner chal raha he.", flush=True)
             print("       Process band karne ke liye (Terminal):", flush=True)
-            print("         lsof -nP -tiTCP:8787 -sTCP:LISTEN | xargs kill -9", flush=True)
+            print(f"         lsof -nP -tiTCP:{PORT} -sTCP:LISTEN | xargs kill -9", flush=True)
             print("       Ya START_SCANNER.command dobara double-click karo —", flush=True)
             print("       wo purana server khud band karke fresh start karta he.", flush=True)
             print("", flush=True)
